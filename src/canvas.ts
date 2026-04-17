@@ -7,8 +7,8 @@ export const MAP_W = 148;
 export const MAP_H = 128;
 
 // Meters visible ahead and behind on the map
-const LOOKAHEAD_M = 200;
-const LOOKBEHIND_M = 200;
+const LOOKAHEAD_M = 100;
+const LOOKBEHIND_M = 50;
 
 
 // Equirectangular projection helpers

@@ -70,9 +70,10 @@ let destPlace:    AutocompleteItem | null = null;
 let polyline:     LatLng[] = [];
 let cumDists:     number[] = [];
 let sections:     RouteSection[] = [];
-let gps:          GPS | null = null;
-let lastPosition: Position | null = null;
-let renderTimer:  number | null = null;
+let gps:           GPS | null = null;
+let lastPosition:  Position | null = null;
+let lastRenderAt:  number = 0;
+const RENDER_INTERVAL_MS = 3000;
 
 // ── Status helper ─────────────────────────────────────────────────────────────
 function setStatus(msg: string, type: 'ok' | 'error' | '' = '') {
@@ -268,6 +269,7 @@ function renderIdle() {
 }
 
 function render() {
+  lastRenderAt = Date.now();
   if (!polyline.length || !lastPosition) {
     renderIdle();
     return;
@@ -350,15 +352,20 @@ async function startNavigation() {
 
     if (!gps) {
       gps = new GPS(
-        (pos) => { lastPosition = pos; },
+        (pos) => {
+          lastPosition = pos;
+          // Render on every GPS update, but throttle to RENDER_INTERVAL_MS
+          const now = Date.now();
+          if (now - lastRenderAt >= RENDER_INTERVAL_MS) {
+            render();
+          }
+        },
         (err) => setStatus(err, 'error')
       );
       gps.start();
     }
 
-    if (renderTimer) clearInterval(renderTimer);
     render();
-    renderTimer = window.setInterval(render, 3000);
 
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
