@@ -94,6 +94,18 @@ export async function searchPlaces(query: string, at?: string): Promise<Autocomp
   return (data.items ?? []) as AutocompleteItem[];
 }
 
+export async function reverseGeocode(lat: number, lng: number): Promise<string> {
+  const key = requireKey();
+  const params = new URLSearchParams({ at: `${lat},${lng}`, lang: 'en', apiKey: key });
+  const res = await fetch(`https://revgeocode.search.hereapi.com/v1/revgeocode?${params}`);
+  if (!res.ok) return '';
+  const data = await res.json();
+  const item = data.items?.[0];
+  if (!item) return '';
+  // Prefer street name, fall back to district/city
+  return item.address?.street ?? item.address?.district ?? item.address?.city ?? item.title ?? '';
+}
+
 export async function lookupPlace(id: string): Promise<AutocompleteItem> {
   const key = requireKey();
   const params = new URLSearchParams({ id, apiKey: key });

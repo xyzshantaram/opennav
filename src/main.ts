@@ -1,4 +1,4 @@
-import { searchPlaces, lookupPlace, getRoute, getApiKey, setApiKey, pickRoadName } from './api';
+import { searchPlaces, lookupPlace, getRoute, getApiKey, setApiKey, pickRoadName, reverseGeocode } from './api';
 import type { AutocompleteItem, RouteSection, TurnAction } from './api';
 import { decodePolyline } from './polyline';
 import type { LatLng } from './polyline';
@@ -20,9 +20,8 @@ const apikeySaveBtn = document.getElementById('apikey-save-btn') as HTMLButtonEl
 const navScreen     = document.getElementById('nav-screen')      as HTMLDivElement;
 const changeKeyBtn  = document.getElementById('change-key-btn')  as HTMLButtonElement;
 
-const originInput   = document.getElementById('origin-input')    as HTMLInputElement;
+const originDisplay = document.getElementById('origin-display')  as HTMLDivElement;
 const destInput     = document.getElementById('dest-input')      as HTMLInputElement;
-const originDrop    = document.getElementById('origin-dropdown') as HTMLDivElement;
 const destDrop      = document.getElementById('dest-dropdown')   as HTMLDivElement;
 const goBtn         = document.getElementById('go-btn')          as HTMLButtonElement;
 const displayCanvas = document.getElementById('display-canvas')  as HTMLCanvasElement;
@@ -42,6 +41,7 @@ function showNavScreen() {
   apikeyScreen.classList.add('hidden');
   navScreen.classList.remove('hidden');
   renderIdle();
+  startGPS();
 }
 
 apikeySaveBtn.addEventListener('click', () => {
@@ -65,7 +65,6 @@ if (getApiKey()) {
 }
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let originPlace:  AutocompleteItem | null = null;
 let destPlace:    AutocompleteItem | null = null;
 let polyline:     LatLng[] = [];
 let cumDists:     number[] = [];
@@ -74,6 +73,52 @@ let gps:           GPS | null = null;
 let lastPosition:  Position | null = null;
 let lastRenderAt:  number = 0;
 const RENDER_INTERVAL_MS = 3000;
+
+// ── GPS startup (runs as soon as nav screen is shown) ─────────────────────────
+let reverseGeocodeTimer: number | null = null;
+
+function startGPS() {
+  if (gps) return; // already running
+  gps = new GPS(
+    (pos) => {
+      lastPosition = pos;
+      updateGoBtn();
+
+      // Reverse geocode at most once every 15s to label the origin field
+      if (!reverseGeocodeTimer) {
+        reverseGeocodeTimer = window.setTimeout(async () => {
+          reverseGeocodeTimer = null;
+          try {
+            const name = await reverseGeocode(pos.lat, pos.lng);
+            originDisplay.textContent = name || `${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}`;
+            originDisplay.classList.add('ready');
+          } catch {
+            originDisplay.textContent = `${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}`;
+            originDisplay.classList.add('ready');
+          }
+        }, 0); // fire immediately on first fix, throttled by resetting after 15s
+        // Reset throttle after 15s
+        window.setTimeout(() => { reverseGeocodeTimer = null; }, 15000);
+      }
+
+      // Re-render if navigating
+      if (polyline.length) {
+        const now = Date.now();
+        if (now - lastRenderAt >= RENDER_INTERVAL_MS) render();
+      }
+    },
+    (err) => {
+      originDisplay.textContent = 'GPS unavailable';
+      setStatus(err, 'error');
+    }
+  );
+  gps.start();
+  originDisplay.textContent = 'acquiring GPS...';
+}
+
+function updateGoBtn() {
+  goBtn.disabled = !(lastPosition && destPlace);
+}
 
 // ── Status helper ─────────────────────────────────────────────────────────────
 function setStatus(msg: string, type: 'ok' | 'error' | '' = '') {
@@ -315,12 +360,14 @@ function render() {
 
 // ── Start navigation ──────────────────────────────────────────────────────────
 async function startNavigation() {
-  if (!originPlace || !destPlace) return;
+  if (!lastPosition || !destPlace) return;
 
   goBtn.disabled = true;
   setStatus('calculating route...');
 
   try {
+    const originCoords = { lat: lastPosition.lat, lng: lastPosition.lng };
+
     async function resolveCoords(item: AutocompleteItem) {
       if (item.position) return item.position;
       const full = await lookupPlace(item.id);
@@ -328,10 +375,7 @@ async function startNavigation() {
       return full.position;
     }
 
-    const [originCoords, destCoords] = await Promise.all([
-      resolveCoords(originPlace!),
-      resolveCoords(destPlace!),
-    ]);
+    const destCoords = await resolveCoords(destPlace!);
 
     const route = await getRoute(originCoords, destCoords);
     sections = route.sections;
@@ -350,21 +394,6 @@ async function startNavigation() {
     const totalKm = (cumDists[cumDists.length - 1] / 1000).toFixed(1);
     setStatus(`route: ${totalKm} km — GPS active`, 'ok');
 
-    if (!gps) {
-      gps = new GPS(
-        (pos) => {
-          lastPosition = pos;
-          // Render on every GPS update, but throttle to RENDER_INTERVAL_MS
-          const now = Date.now();
-          if (now - lastRenderAt >= RENDER_INTERVAL_MS) {
-            render();
-          }
-        },
-        (err) => setStatus(err, 'error')
-      );
-      gps.start();
-    }
-
     render();
 
   } catch (e) {
@@ -376,14 +405,9 @@ async function startNavigation() {
 }
 
 // ── Wire up ───────────────────────────────────────────────────────────────────
-buildAutocomplete(originInput, originDrop, (item) => {
-  originPlace = item;
-  goBtn.disabled = !(originPlace && destPlace);
-});
-
 buildAutocomplete(destInput, destDrop, (item) => {
   destPlace = item;
-  goBtn.disabled = !(originPlace && destPlace);
+  updateGoBtn();
 });
 
 goBtn.addEventListener('click', startNavigation);

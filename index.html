@@ -97,6 +97,36 @@
       max-width: 400px;
     }
 
+    .location-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .location-field label {
+      font-size: 0.65rem;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .location-display {
+      background: #161616;
+      border: 1px solid #2a2a2a;
+      color: #666;
+      font-family: monospace;
+      font-size: 0.9rem;
+      padding: 8px 10px;
+      border-radius: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .location-display.ready {
+      color: #aaa;
+    }
+
     .search-field {
       position: relative;
     }
@@ -259,10 +289,9 @@
   <!-- Main nav UI -->
   <div id="nav-screen" class="hidden">
     <div class="search-panel">
-      <div class="search-field">
+      <div class="location-field">
         <label>From</label>
-        <input type="text" id="origin-input" placeholder="Search origin..." autocomplete="off" />
-        <div class="autocomplete-dropdown hidden" id="origin-dropdown"></div>
+        <div class="location-display" id="origin-display">acquiring GPS...</div>
       </div>
 
       <div class="search-field">
