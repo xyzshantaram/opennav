@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>OpenNav</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #111;
+      color: #eee;
+      font-family: monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100dvh;
+      padding: 16px;
+      gap: 16px;
+    }
+
+    h1 {
+      font-size: 1rem;
+      letter-spacing: 0.2em;
+      color: #aaa;
+      text-transform: uppercase;
+    }
+
+    /* ── API key setup screen ── */
+    #apikey-screen {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: 100%;
+      max-width: 400px;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 6px;
+      padding: 16px;
+    }
+
+    #apikey-screen.hidden { display: none; }
+
+    #apikey-screen h2 {
+      font-size: 0.8rem;
+      color: #aaa;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    #apikey-screen p {
+      font-size: 0.75rem;
+      color: #666;
+      line-height: 1.5;
+    }
+
+    #apikey-screen a {
+      color: #888;
+    }
+
+    .key-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .key-row input {
+      flex: 1;
+      background: #111;
+      border: 1px solid #333;
+      color: #eee;
+      font-family: monospace;
+      font-size: 0.85rem;
+      padding: 8px 10px;
+      outline: none;
+      border-radius: 4px;
+      min-width: 0;
+    }
+
+    .key-row input:focus { border-color: #555; }
+
+    /* ── Nav screen ── */
+    #nav-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      width: 100%;
+    }
+
+    #nav-screen.hidden { display: none; }
+
+    .search-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: 100%;
+      max-width: 400px;
+    }
+
+    .search-field {
+      position: relative;
+    }
+
+    .search-field label {
+      font-size: 0.65rem;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .search-field input {
+      width: 100%;
+      background: #1e1e1e;
+      border: 1px solid #333;
+      color: #eee;
+      font-family: monospace;
+      font-size: 0.9rem;
+      padding: 8px 10px;
+      outline: none;
+      border-radius: 4px;
+    }
+
+    .search-field input:focus { border-color: #555; }
+
+    .autocomplete-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: #1e1e1e;
+      border: 1px solid #444;
+      border-top: none;
+      z-index: 100;
+      max-height: 200px;
+      overflow-y: auto;
+      border-radius: 0 0 4px 4px;
+    }
+
+    .autocomplete-dropdown.hidden { display: none; }
+
+    .autocomplete-item {
+      padding: 8px 10px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      border-bottom: 1px solid #2a2a2a;
+      line-height: 1.3;
+    }
+
+    .autocomplete-item:hover,
+    .autocomplete-item.active { background: #2a2a2a; }
+
+    .autocomplete-item .title { color: #eee; }
+    .autocomplete-item .subtitle { color: #666; font-size: 0.7rem; margin-top: 2px; }
+
+    /* ── Buttons ── */
+    .btn {
+      background: #222;
+      border: 1px solid #444;
+      color: #eee;
+      font-family: monospace;
+      font-size: 0.85rem;
+      padding: 8px 14px;
+      cursor: pointer;
+      border-radius: 4px;
+      letter-spacing: 0.05em;
+      white-space: nowrap;
+    }
+
+    .btn:hover { background: #2a2a2a; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn.full { width: 100%; text-transform: uppercase; letter-spacing: 0.1em; }
+
+    /* ── e-ink display simulation ── */
+    .display-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .display-label {
+      font-size: 0.6rem;
+      color: #555;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+    }
+
+    .display-bezel {
+      background: #1a1a1a;
+      border: 2px solid #333;
+      border-radius: 4px;
+      padding: 6px;
+    }
+
+    /* 296x128 scaled 2x for readability on desktop */
+    #display-canvas {
+      display: block;
+      image-rendering: pixelated;
+      width: 592px;
+      height: 256px;
+    }
+
+    .status-bar {
+      font-size: 0.65rem;
+      color: #555;
+      letter-spacing: 0.1em;
+      height: 16px;
+    }
+
+    .status-bar.error { color: #c44; }
+    .status-bar.ok    { color: #4a4; }
+
+    .change-key-row {
+      font-size: 0.65rem;
+      color: #444;
+    }
+
+    .change-key-row button {
+      background: none;
+      border: none;
+      color: #555;
+      font-family: monospace;
+      font-size: 0.65rem;
+      cursor: pointer;
+      text-decoration: underline;
+      padding: 0;
+    }
+
+    .change-key-row button:hover { color: #888; }
+
+    @media (max-width: 640px) {
+      #display-canvas {
+        width: 296px;
+        height: 128px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>OpenNav</h1>
+
+  <!-- API key setup -->
+  <div id="apikey-screen">
+    <h2>HERE API Key</h2>
+    <p>
+      OpenNav uses the HERE Maps API. It's free for up to 250k requests/month.<br><br>
+      Get your key at
+      <a href="https://developer.here.com/" target="_blank" rel="noopener">developer.here.com</a>
+      &rarr; sign up &rarr; create a project &rarr; copy the API key.
+    </p>
+    <div class="key-row">
+      <input type="text" id="apikey-input" placeholder="Paste your HERE API key..." autocomplete="off" spellcheck="false" />
+      <button class="btn" id="apikey-save-btn">Save</button>
+    </div>
+  </div>
+
+  <!-- Main nav UI -->
+  <div id="nav-screen" class="hidden">
+    <div class="search-panel">
+      <div class="search-field">
+        <label>From</label>
+        <input type="text" id="origin-input" placeholder="Search origin..." autocomplete="off" />
+        <div class="autocomplete-dropdown hidden" id="origin-dropdown"></div>
+      </div>
+
+      <div class="search-field">
+        <label>To</label>
+        <input type="text" id="dest-input" placeholder="Search destination..." autocomplete="off" />
+        <div class="autocomplete-dropdown hidden" id="dest-dropdown"></div>
+      </div>
+
+      <button class="btn full" id="go-btn" disabled>Navigate</button>
+    </div>
+
+    <div class="display-wrapper">
+      <div class="display-label">296 &times; 128 &mdash; e-ink preview</div>
+      <div class="display-bezel">
+        <canvas id="display-canvas" width="296" height="128"></canvas>
+      </div>
+      <div class="status-bar" id="status">waiting for route</div>
+    </div>
+
+    <div class="change-key-row">
+      <button id="change-key-btn">change API key</button>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
