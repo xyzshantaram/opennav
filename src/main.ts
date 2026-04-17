@@ -30,6 +30,17 @@ const statusEl      = document.getElementById('status')          as HTMLDivEleme
 const ctx = displayCanvas.getContext('2d')!;
 ctx.imageSmoothingEnabled = false;;
 
+// ── State ─────────────────────────────────────────────────────────────────────
+let destPlace:    AutocompleteItem | null = null;
+let polyline:     LatLng[] = [];
+let cumDists:     number[] = [];
+let sections:     RouteSection[] = [];
+let gps:           GPS | null = null;
+let lastPosition:  Position | null = null;
+let lastRenderAt:  number = 0;
+let reverseGeocodeTimer: number | null = null;
+const RENDER_INTERVAL_MS = 3000;
+
 // ── API key screen ────────────────────────────────────────────────────────────
 function showApiKeyScreen() {
   apikeyScreen.classList.remove('hidden');
@@ -64,18 +75,7 @@ if (getApiKey()) {
   showApiKeyScreen();
 }
 
-// ── State ─────────────────────────────────────────────────────────────────────
-let destPlace:    AutocompleteItem | null = null;
-let polyline:     LatLng[] = [];
-let cumDists:     number[] = [];
-let sections:     RouteSection[] = [];
-let gps:           GPS | null = null;
-let lastPosition:  Position | null = null;
-let lastRenderAt:  number = 0;
-const RENDER_INTERVAL_MS = 3000;
-
 // ── GPS startup (runs as soon as nav screen is shown) ─────────────────────────
-let reverseGeocodeTimer: number | null = null;
 
 function startGPS() {
   if (gps) return; // already running
